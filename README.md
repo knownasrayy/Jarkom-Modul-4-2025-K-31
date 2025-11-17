@@ -582,3 +582,69 @@ write memory
 | Elrond                  | A23        | 10.79.15.3     | 255.255.255.192 | 10.79.15.1   |
 
 
+---
+
+# CIDR (Classless Inter-Domain Routing)
+
+Implementasi **CIDR** pada topologi ini bertujuan untuk melakukan *Supernetting*, yaitu penggabungan subnet-subnet kecil (VLSM) menjadi blok jaringan yang lebih besar (Supernet). Hal ini berguna untuk meringkas tabel routing (*Route Summarization*) agar lebih efisien.
+
+## 1. Pohon CIDR (CIDR Tree)
+Visualisasi hierarki penggabungan dari subnet terkecil (*Leaf*) menuju supernet utama (*Root*).
+
+![CIDR Tree Diagram](https://github.com/user-attachments/assets/PLACEHOLDER_LINK_GAMBAR_POHON_CIDR_KAMU)
+*(Diagram alur penggabungan subnet A menjadi blok B, C, dan D)*
+
+## 2. Tabel Penggabungan Subnet (Route Summarization)
+
+Tabel ini menunjukkan logika penggabungan subnet berdasarkan kedekatan bit network.
+
+### Tahap 1 (Level B)
+Menggabungkan subnet-subnet tetangga menjadi blok `/24` hingga `/21`.
+
+| Subnet Baru | Gabungan Dari (Subnet 1) | Gabungan Dari (Subnet 2) | Netmask Baru | Network ID Hasil |
+| :--- | :--- | :--- | :--- | :--- |
+| **B1** | A7 (`/25`) | A10 (`/25`) | **/24** | `10.79.14.0/24` |
+| **B2** | B1 (`/24`) | Subnet 15.x (`/24`)* | **/23** | `10.79.14.0/23` |
+| **B3** | A16 (`/23`) | A1 (`/23`) | **/22** | `10.79.8.0/22` |
+| **B4** | A15 (`/23`) | B2 (`/23`) | **/22** | `10.79.12.0/22` |
+| **B5** | A12 (`/22`) | A19 (`/22`) | **/21** | `10.79.0.0/21` |
+
+> **Catatan:** *Subnet 15.x* adalah representasi gabungan seluruh subnet kecil (A2, A3, A4, dst) yang berada di range `10.79.15.0` - `10.79.15.255`.
+
+### Tahap 2 (Level C)
+Menggabungkan hasil dari Tahap 1 menjadi blok menengah.
+
+| Subnet Baru | Gabungan Dari (Subnet 1) | Gabungan Dari (Subnet 2) | Netmask Baru | Network ID Hasil |
+| :--- | :--- | :--- | :--- | :--- |
+| **C1** | B3 (`/22`) | B4 (`/22`) | **/21** | `10.79.8.0/21` |
+
+### Tahap 3 (Level D - Supernet Utama)
+Penggabungan akhir menjadi satu blok jaringan utama yang mencakup seluruh topologi.
+
+| Subnet Baru | Gabungan Dari (Subnet 1) | Gabungan Dari (Subnet 2) | Netmask Baru | Network ID Hasil |
+| :--- | :--- | :--- | :--- | :--- |
+| **D1** | B5 (`/21`) | C1 (`/21`) | **/20** | `10.79.0.0/20` |
+
+---
+
+## 3. Tabel Alokasi IP CIDR (Details)
+
+Rincian teknis untuk blok-blok jaringan hasil penggabungan (*Supernet Blocks*).
+
+| Kode Blok | Network ID | Netmask | Broadcast Address | Range IP Valid | Total IP |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **B1** | `10.79.14.0` | `255.255.255.0` | `10.79.14.255` | `10.79.14.1 - 10.79.14.254` | 256 |
+| **B2** | `10.79.14.0` | `255.255.254.0` | `10.79.15.255` | `10.79.14.1 - 10.79.15.254` | 512 |
+| **B3** | `10.79.8.0` | `255.255.252.0` | `10.79.11.255` | `10.79.8.1 - 10.79.11.254` | 1024 |
+| **B4** | `10.79.12.0` | `255.255.252.0` | `10.79.15.255` | `10.79.12.1 - 10.79.15.254` | 1024 |
+| **B5** | `10.79.0.0` | `255.255.248.0` | `10.79.7.255` | `10.79.0.1 - 10.79.7.254` | 2048 |
+| **C1** | `10.79.8.0` | `255.255.248.0` | `10.79.15.255` | `10.79.8.1 - 10.79.15.254` | 2048 |
+| **D1** | **10.79.0.0** | **255.255.240.0** | **10.79.15.255** | **10.79.0.1 - 10.79.15.254** | **4096** |
+
+---
+
+## Kesimpulan Routing
+
+Dengan skema CIDR di atas, Router Eksternal (Internet/ISP) hanya perlu mengetahui satu rute untuk menghubungi seluruh jaringan Kelompok K31:
+
+`ip route 10.79.0.0 255.255.240.0 [Gateway_Amonsul]`
